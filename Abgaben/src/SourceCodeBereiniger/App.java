@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
@@ -60,6 +61,7 @@ public class App {
     }
     reader.close();
     writer.close();
+    Files.delete(path);
 
     }
 
