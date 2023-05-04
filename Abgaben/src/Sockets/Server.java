@@ -1,8 +1,6 @@
 package Sockets;
 
 import java.io.DataInputStream;
-import java.io.File;
-import java.io.FileWriter;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.net.ServerSocket;
