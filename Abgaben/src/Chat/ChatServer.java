@@ -6,6 +6,7 @@ import java.util.*;
 
 public class ChatServer {
     private ArrayList<PrintWriter> clientOutputStreams;
+    private ArrayList<String> connectedUsers;
 
     public static void main(String[] args) {
         new ChatServer().startServer();
@@ -13,6 +14,7 @@ public class ChatServer {
 
     public void startServer() {
         clientOutputStreams = new ArrayList<>();
+        connectedUsers = new ArrayList<>();
 
         try {
             ServerSocket serverSocket = new ServerSocket(5000);
@@ -39,13 +41,32 @@ public class ChatServer {
         }
     }
 
-    public void removeClient(PrintWriter writer) {
-        clientOutputStreams.remove(writer);
+    public void addConnectedUser(String username) {
+        connectedUsers.add(username);
+        broadcastUserList();
+    }
+
+    public void removeConnectedUser(String username) {
+        connectedUsers.remove(username);
+        broadcastUserList();
+    }
+
+    private void broadcastUserList() {
+        StringBuilder userList = new StringBuilder("[userlist]");
+        for (String user : connectedUsers) {
+            userList.append(user).append(",");
+        }
+        userList.deleteCharAt(userList.length() - 1); // Remove the last comma
+        for (PrintWriter writer : clientOutputStreams) {
+            writer.println(userList.toString());
+            writer.flush();
+        }
     }
 
     public class ClientHandler implements Runnable {
         private Socket clientSocket;
         private PrintWriter writer;
+        private BufferedReader reader;
         private String username;
 
         public ClientHandler(Socket clientSocket, PrintWriter writer) {
@@ -56,11 +77,12 @@ public class ChatServer {
         @Override
         public void run() {
             try {
-                BufferedReader reader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+                reader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
                 String message;
                 while ((message = reader.readLine()) != null) {
                     if (username == null) {
                         username = message;
+                        addConnectedUser(username);
                         sendUserJoinedMessage();
                     } else {
                         broadcastMessage(username + ": " + message);
@@ -69,8 +91,15 @@ public class ChatServer {
             } catch (IOException e) {
                 e.printStackTrace();
             } finally {
-                removeClient(writer);
+                removeConnectedUser(username);
                 sendUserLeftMessage();
+                try {
+                    reader.close();
+                    writer.close();
+                    clientSocket.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
             }
         }
 
