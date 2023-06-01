@@ -75,6 +75,7 @@ public class ChatClient extends JFrame implements ActionListener {
 
         // Prompt for username
         username = promptForUsername();
+        connectedUsersModel.addElement(username);
 
         // Set up network connection
         setUpNetworking();
@@ -107,6 +108,8 @@ public class ChatClient extends JFrame implements ActionListener {
             reader = new BufferedReader(streamReader);
             writer = new PrintWriter(socket.getOutputStream());
             System.out.println("Network connection established...");
+            writer.println(username);
+            writer.flush();
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -115,7 +118,7 @@ public class ChatClient extends JFrame implements ActionListener {
     private void sendMessage() {
         String message = messageTextField.getText();
         if (!message.isEmpty()) {
-            writer.println(username + ": " + message);
+            writer.println(message);
             writer.flush();
             messageTextField.setText("");
         }
@@ -135,7 +138,7 @@ public class ChatClient extends JFrame implements ActionListener {
             String message;
             try {
                 while ((message = reader.readLine()) != null) {
-                    if (message.startsWith("!userlist:")) {
+                    if (message.startsWith("[userlist]")) {
                         processUserList(message.substring(10));
                     } else {
                         chatTextArea.append(message + "\n");
