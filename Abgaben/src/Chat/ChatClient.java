@@ -1,23 +1,22 @@
 package Chat;
-
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.awt.event.KeyAdapter;
-import java.awt.event.KeyEvent;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
 import java.util.ArrayList;
+import java.util.List;
 
 public class ChatClient extends JFrame implements ActionListener {
 
     private JTextArea chatTextArea;
     private JList<String> userList;
     private JTextField messageTextField;
+    private JButton privateMessageButton;  // New button for private messaging
     private BufferedReader reader;
     private PrintWriter writer;
     private Socket socket;
@@ -63,10 +62,13 @@ public class ChatClient extends JFrame implements ActionListener {
         messagePanel.setLayout(new BorderLayout());
         messageTextField = new JTextField(30);
         messageTextField.setFont(new Font("Arial", Font.PLAIN, 16)); // Set font size
-        JButton sendButton = new JButton("Senden");
+        JButton sendButton = new JButton("Send");
         sendButton.addActionListener(this);
+        privateMessageButton = new JButton("Private Message");  // Initialize the private message button
+        privateMessageButton.addActionListener(this);  // Add ActionListener for the private message button
         messagePanel.add(messageTextField, BorderLayout.CENTER);
         messagePanel.add(sendButton, BorderLayout.EAST);
+        messagePanel.add(privateMessageButton, BorderLayout.WEST);  // Add the private message button to the message panel
 
         // Add panels to the main frame
         add(chatPanel, BorderLayout.CENTER);
@@ -85,14 +87,7 @@ public class ChatClient extends JFrame implements ActionListener {
         readerThread.start();
 
         // Send message when Enter key is pressed
-        messageTextField.addKeyListener(new KeyAdapter() {
-            @Override
-            public void keyPressed(KeyEvent e) {
-                if (e.getKeyCode() == KeyEvent.VK_ENTER) {
-                    sendMessage();
-                }
-            }
-        });
+        messageTextField.addActionListener(this);
 
         setVisible(true);
     }
@@ -103,62 +98,203 @@ public class ChatClient extends JFrame implements ActionListener {
 
     private void setUpNetworking() {
         try {
-            socket = new Socket("192.168.55.174", 5000);
+            String host = "localhost"; // Change to server IP address or hostname
+            int port = 5000; // Change to server port number
+
+            socket = new Socket(host, port);
             InputStreamReader streamReader = new InputStreamReader(socket.getInputStream());
             reader = new BufferedReader(streamReader);
             writer = new PrintWriter(socket.getOutputStream());
             System.out.println("Network connection established...");
+
+            // Send the username to the server
             writer.println(username);
             writer.flush();
-        } catch (IOException e) {
-            e.printStackTrace();
+        } catch (IOException ex) {
+            ex.printStackTrace();
         }
     }
 
     private void sendMessage() {
         String message = messageTextField.getText();
-        if (!message.isEmpty()) {
-            writer.println(message);
-            writer.flush();
-            messageTextField.setText("");
-        }
+        writer.println(message);
+        writer.flush();
+        messageTextField.setText("");
+        messageTextField.requestFocus();
     }
 
-    private void processUserList(String userList) {
+    private void sendPrivateMessage(String recipient) {
+        String message = messageTextField.getText();
+        writer.println("[PRIVATE]" + recipient + ": " + message);
+        writer.flush();
+        messageTextField.setText("");
+        messageTextField.requestFocus();
+    }
+
+    private void processMessage(String message) {
+        chatTextArea.append(message + "\n");
+        chatTextArea.setCaretPosition(chatTextArea.getDocument().getLength());
+    }
+
+    private void processUserList(String userListString) {
+        String[] users = userListString.split(",");
         connectedUsersModel.clear();
-        String[] users = userList.split(",");
         for (String user : users) {
-            connectedUsersModel.addElement(user.trim());
-        }
-    }
-
-    public class IncomingReader implements Runnable {
-        @Override
-        public void run() {
-            String message;
-            try {
-                while ((message = reader.readLine()) != null) {
-                    if (message.startsWith("[userlist]")) {
-                        processUserList(message.substring(10));
-                    } else {
-                        chatTextArea.append(message + "\n");
-                    }
-                }
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+            connectedUsersModel.addElement(user);
         }
     }
 
     @Override
     public void actionPerformed(ActionEvent e) {
-        if (e.getActionCommand().equals("Senden")) {
+        if (e.getSource() instanceof JButton) {
+            JButton sourceButton = (JButton) e.getSource();
+            if (sourceButton == privateMessageButton) {
+                String recipient = userList.getSelectedValue();
+                if (recipient != null && !recipient.equals(username)) {
+                    sendPrivateMessage(recipient);
+                }
+            } else {
+                sendMessage();
+            }
+        } else if (e.getSource() instanceof JTextField) {
             sendMessage();
         }
     }
 
+    private class IncomingReader implements Runnable {
+        @Override
+        public void run() {
+            String message;
+            try {
+                while ((message = reader.readLine()) != null) {
+                    if (message.startsWith("[USERLIST]")) {
+                        String userListString = message.substring(10);
+                        processUserList(userListString);
+                    } else if (message.startsWith("[PRIVATE]")) {
+                        processMessage(message.substring(9) + " (Private)");
+                    } else {
+                        processMessage(message);
+                    }
+                }
+            } catch (IOException ex) {
+                ex.printStackTrace();
+            }
+        }
+    }
+
     public static void main(String[] args) {
-        ChatClient chatClient = new ChatClient("Einfacher Chat-Client");
-        chatClient.setVisible(true);
+        SwingUtilities.invokeLater(() -> new ChatClient("Chat Client"));
     }
 }
+
+
+
+
+
+
+
+//import javax.swing.*;
+//import java.awt.*;
+//import java.awt.event.ActionEvent;
+//import java.awt.event.ActionListener;
+//import java.io.BufferedReader;
+//import java.io.IOException;
+//import java.io.InputStreamReader;
+//import java.io.PrintWriter;
+//import java.net.Socket;
+//
+//public class _2023_05_25__ClientChat_JFrame_Sockets extends JFrame implements ActionListener {
+//    private JTextArea incomingTextArea;
+//    private JTextField outgoingTextField;
+//    private PrintWriter writer;
+//    private Socket socket;
+//    private String username;
+//
+//    public _2023_05_25__ClientChat_JFrame_Sockets(String title) {
+//        super(title);
+//
+//        incomingTextArea = new JTextArea(15, 20);
+//        incomingTextArea.setLineWrap(true);
+//        incomingTextArea.setWrapStyleWord(true);
+//        incomingTextArea.setEditable(false);
+//        JScrollPane scrollPane = new JScrollPane(incomingTextArea);
+//        scrollPane.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS);
+//        scrollPane.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+//
+//        outgoingTextField = new JTextField(20);
+//        JButton sendButton = new JButton("Send");
+//        sendButton.addActionListener(this);
+//
+//        JPanel panel = new JPanel();
+//        panel.add(scrollPane);
+//        panel.add(outgoingTextField);
+//        panel.add(sendButton);
+//
+//        add(panel);
+//
+//        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+//        setSize(400, 400);
+//        setVisible(true);
+//
+//        username = JOptionPane.showInputDialog(this, "Enter your name:");
+//
+//        connectToServer();
+//        startMessageReaderThread();
+//    }
+//
+//    private void connectToServer() {
+//        try {
+//            socket = new Socket("localhost", 5000);
+//            writer = new PrintWriter(socket.getOutputStream());
+//            System.out.println("Connected to server");
+//        } catch (IOException e) {
+//            e.printStackTrace();
+//        }
+//    }
+//
+//    private void startMessageReaderThread() {
+//        Thread readerThread = new Thread(new IncomingReader());
+//        readerThread.start();
+//    }
+//
+//    public void actionPerformed(ActionEvent e) {
+//        String message = outgoingTextField.getText();
+//        sendMessage(message);
+//        outgoingTextField.setText("");
+//    }
+//
+//    public void sendMessage(String message) {
+//        writer.println(username + ": " + message);
+//        writer.flush();
+//    }
+//
+//    public class IncomingReader implements Runnable {
+//        private BufferedReader reader;
+//
+//        public IncomingReader() {
+//            try {
+//                InputStreamReader streamReader = new InputStreamReader(socket.getInputStream());
+//                reader = new BufferedReader(streamReader);
+//            } catch (IOException e) {
+//                e.printStackTrace();
+//            }
+//        }
+//
+//        public void run() {
+//            String message;
+//            try {
+//                while ((message = reader.readLine()) != null) {
+//                    System.out.println("Received message: " + message);
+//                    incomingTextArea.append(message + "\n");
+//                }
+//            } catch (IOException e) {
+//                e.printStackTrace();
+//            }
+//        }
+//    }
+//
+//    public static void main(String[] args) {
+//        SwingUtilities.invokeLater(() -> new _2023_05_25__ClientChat_JFrame_Sockets("Chat Client"));
+//    }
+//}
+//
